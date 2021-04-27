@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from collections import defaultdict, deque
 from itertools import count
+from copy import deepcopy
 
-nodes = dict()
+nodes = defaultdict(list)
 loglets = deque([nodes])
 ids = count(1)
 
@@ -12,11 +13,58 @@ ids = count(1)
 
 
 def add_loglet():
-    loglets.append(dict.fromkeys(nodes.keys()))
+    global nodes
+    _nodes = defaultdict(list)
+    loglets.append(_nodes)
+    nodes = _nodes
 
 
 def trim_loglet():
     loglets.popleft()
+
+
+class LogIterator():
+
+    def __init__(self, color):
+        self.color = color
+
+    def __iter__(self):
+        # two pointers
+        self.idx_loglet = len(loglets) - 1  # always valid
+        self.idx_item = -1
+        if self.idx_loglet != -1:
+            self.idx_item = len(loglets[-1][self.color]) - 1
+        return self
+
+    def __next__(self):
+        self._find_next()
+        if self.idx_item != -1:
+            loglet = loglets[self.idx_loglet]
+            chain = loglet[self.color]
+            _item = chain[self.idx_item]
+            self.idx_item -= 1
+            return _item
+        else:
+            raise StopIteration()
+
+    def _find_next(self):
+        # set the two pointers of the next available element to
+        # a concrete position or (0, -1) indicating list exhausted
+
+        if self.idx_loglet == 0 and self.idx_item == -1:
+            return
+
+        while not(0 <= self.idx_item < len(loglets[self.idx_loglet][self.color])):
+            if self.idx_item == -1:
+                self.idx_loglet -= 1
+                if self.idx_loglet >= 0:
+                    self.idx_item = len(loglets[self.idx_loglet][self.color]) - 1
+                else:
+                    self.idx_item = -1
+                if self.idx_loglet == 0 and self.idx_item == -1:
+                    break
+            else:
+                raise RuntimeError()
 
 
 @dataclass
@@ -25,63 +73,61 @@ class Target:
     color: str
 
 
-class Loglet():
-    pass
-
-
 class Node():
-    def __init__(self, nid=None, payload="N/A", colors=None, parents=None):
+    def __init__(self, nid=None, payload="N/A", targets=None):
         self.nid = nid or next(ids)
         self.payload = payload
-        self.colors = colors or set()
-        self.parents = parents or []
+        self.targets = targets or []
+
+    def __str__(self):
+        return str(self.nid)
 
 
 def _appendable(target):
-    if target.color in nodes:
-        return nodes[target.color].nid == target.nid
+    if target.color in nodes and nodes[target.color]:
+        return nodes[target.color][-1].nid == target.nid
     else:  # new color
         return True
-
-
-def _append(node, target):
-    if target.color in nodes:
-        node.parents.append(nodes[target.color])
-    if target.color not in node.colors:
-        node.colors.add(target.color)
-    nodes[target.color] = node
 
 
 def append(node, targets):
     if not all(map(_appendable, targets)):
         raise ValueError()
+
+    node.targets = [target for target in targets if target.nid]
     for target in targets:
-        _append(node, target)
+        nodes[target.color].append(deepcopy(node))
+
     # DEBUG
-    _readall()
+    # _readall()
 
 
-def _read(root):
-    print(''.join(color[0] for color in root.colors), root.nid, sep='', end=' ')
-    for parent in root.parents:
-        _read(parent)
-
-
-def read(color):
-    if color in nodes:
-        print(color, "\t", end=' ')
-        _read(nodes[color])
-        print()
-
-
-def seek(target, depth=100):
-    pass
+def seek(target, _ans=None):
+    chain = LogIterator(target.color)
+    if _ans is None:
+        _ans = []
+    _targets = []
+    _found = False
+    for node in chain:
+        if _found or node.nid == target.nid or target.nid is None:
+            _found = True
+            if node.nid not in _ans:
+                _ans.append(node.nid)
+            for _target in node.targets:
+                if _target.color != target.color:
+                    _targets.append(_target)
+    for _target in _targets:
+        seek(_target, _ans)
+    return _ans
 
 
 def _readall():
-    read("RED")
-    read("YELLOW")
-    read("GREEN")
+    print("RED")
+    print(seek(Target(None, "RED")))
+    print("YELLOW")
+    print(seek(Target(None, "YELLOW")))
+    print("GREEN")
+    print(seek(Target(None, "GREEN")))
     print()
 
 #                                    (Active)
@@ -111,4 +157,14 @@ if __name__ == '__main__':
     append(Node(), [Target(7, "YELLOW"), Target(5, "GREEN")])
     append(Node(), [Target(8, "YELLOW"), Target(8, "GREEN"), Target(6, "RED")])
     # DEBUG
-    # _readall()
+    _readall()
+    add_loglet()
+    append(Node(), [Target(9, "RED")])
+    append(Node(), [Target(9, "YELLOW")])
+    append(Node(), [Target(9, "GREEN")])
+    append(Node(), [Target(10, "RED")])
+    # DEBUG
+    _readall()
+    trim_loglet()
+    # DEBUG
+    _readall()
