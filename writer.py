@@ -5,7 +5,7 @@ from enum import Enum
 from itertools import count
 from multiprocessing import Process, Queue
 from queue import Empty
-from time import sleep, perf_counter
+from time import perf_counter, sleep
 
 logging.basicConfig(level='INFO')
 
@@ -26,46 +26,50 @@ LogEntry = namedtuple("LogEntry", ("colors, payload"))
 
 # RED: A -> B -> C -> D
 # GRN:                D -> E
-# BLU: X ----------------> E -> Y
+# BLU:      X -----------> E -> Y
 
 
-def client1(queue):
+def fuzz():
+    return 1
+
+
+def client1(log):
     logging.info("S1")
-    queue.put(LogEntry((Color.RED, ), "A"))
-    sleep(1)
-    queue.put(LogEntry((Color.RED, ), "B"))
-    sleep(1)
-    queue.put(LogEntry((Color.RED, ), "C"))
-    sleep(1)
-    queue.put(LogEntry((Color.RED, Color.GREEN), "D"))
+    log.put(LogEntry((Color.RED, ), "A"))
+    sleep(fuzz())
+    log.put(LogEntry((Color.RED, ), "B"))
+    sleep(fuzz())
+    log.put(LogEntry((Color.RED, ), "C"))
+    sleep(fuzz())
+    log.put(LogEntry((Color.RED, Color.GREEN), "D"))
 
 
-def client2(queue):
+def client2(log):
     logging.info("S2")
     # ---
-    sleep(1)
+    sleep(fuzz())
     # ---
-    sleep(1)
+    sleep(fuzz())
     # ---
-    sleep(1)
+    sleep(fuzz())
     # ---
-    sleep(1)
-    queue.put(LogEntry((Color.GREEN, Color.BLUE), "E"))
+    sleep(fuzz())
+    log.put(LogEntry((Color.GREEN, Color.BLUE), "E"))
 
 
-def client3(queue):
+def client3(log):
     logging.info("S3")
-    queue.put(LogEntry((Color.BLUE, ), "X"))
-    sleep(1)
     # ---
-    sleep(1)
+    sleep(fuzz())
+    log.put(LogEntry((Color.BLUE, ), "X"))
+    sleep(fuzz())
     # ---
-    sleep(1)
+    sleep(fuzz())
     # ---
-    sleep(1)
+    sleep(fuzz())
     # ---
-    sleep(1)
-    queue.put(LogEntry((Color.BLUE, ), "Y"))
+    sleep(fuzz())
+    log.put(LogEntry((Color.BLUE, ), "Y"))
 
 
 def write(file, red, green, blue):
