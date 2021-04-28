@@ -42,7 +42,7 @@ class RecvDataThread(threading.Thread):
                         self.running = False
                         self.clientSocket.close()
                         self.senDataThread.terminate()
-                        print("通信结束，摁任意键关闭")
+                        print("通信结束，按任意键关闭")
             except:
                 pass
 
