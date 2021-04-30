@@ -2,6 +2,7 @@
 import socket
 import threading
 import time
+import json
 
 class SendDataThread(threading.Thread):
     def setDestination(self, clientSocket, recvDataThread):
@@ -35,9 +36,17 @@ class RecvDataThread(threading.Thread):
         self.running = True
         while (self.running):
             try:
-                dataReceived = str(self.clientSocket.recv(1024), "utf-8")
+                #dataReceived = json.loads(self.clientSocket.recv(1024).decode("utf-8"))  
+                dataReceived = self.clientSocket.recv(1024).decode("utf-8")
                 if dataReceived != "":
-                    print("\n客户端来信：%s" % str(dataReceived))
+                    #dataReceived = json.loads(received)
+                    print("\n客户端来信: ")
+                    print(dataReceived)
+                    print(type(dataReceived))
+                    print(repr(dataReceived))
+                    dataDict = json.loads(dataReceived)
+                    print("\njson format: ")
+                    print(dataDict)
                     if dataReceived == "over":
                         self.running = False
                         self.clientSocket.close()
@@ -46,18 +55,27 @@ class RecvDataThread(threading.Thread):
             except:
                 pass
 
-def main():
+if __name__ == "__main__":
     tcpServerSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tcpServerSocket.bind(("", 2021))
     tcpServerSocket.listen(128)
-
+ 
     tcpClientSocket = None
     serverOnUse = False
-
+ 
     print("等待客户端连接")
     tcpClientSocket, clientIp = tcpServerSocket.accept()
     print("新的客户端已连接：%s" % str(clientIp))
-
+ 
     sendDataThread = SendDataThread()
     recvDataThread = RecvDataThread()
     sendDataThread.setDestination(tcpClientSocket, recvDataThread)
+    recvDataThread.setSource(tcpClientSocket, sendDataThread)
+ 
+    sendDataThread.start()
+    recvDataThread.start()
+ 
+    sendDataThread.join()
+    recvDataThread.join()
+ 
+    tcpServerSocket.close()

@@ -23,6 +23,30 @@ def trim_loglet():
     loglets.popleft()
 
 
+class Loglet():
+    
+    def __init__(self):
+        self._data = defaultdict(list)
+
+    def append(self, node):
+        # if not self._data.has_key(color):
+        #     raise ValueError()
+        self._data[node.color].append(deepcopy(node))
+
+    def read_by_index(self, color, index):
+        if 0 <= index < len(self._data.get(color, [])):
+            return self._data[color][index]
+        return None
+
+    def read_by_target(self, target):
+        if target.color not in self._data:
+            raise ValueError()
+        chain = self._data.get(target.color, [])
+        for node in chain:
+            if node.nid == target.nid:
+                return node
+        return "Cannot find out the target node!"
+
 class LogIterator():
 
     def __init__(self, color):
@@ -168,3 +192,24 @@ if __name__ == '__main__':
     trim_loglet()
     # DEBUG
     _readall()
+
+    # Test of Loglet class
+    loglet = Loglet()
+    loglet.append(Target(None, "RED"))
+    loglet.append(Target(1, "RED"))
+    loglet.append(Target(2, "RED"))
+    loglet.append(Target(None, "YELLOW"))
+    loglet.append(Target(None, "GREEN"))
+    loglet.append(Target(4, "GREEN"))
+    loglet.append(Target(3, "RED"))
+    loglet.append(Target(3, "YELLOW"))
+    loglet.append(Target(7, "YELLOW"))
+    loglet.append(Target(5, "GREEN"))
+    loglet.append(Target(8, "YELLOW"))
+    loglet.append(Target(8, "GREEN"))
+    loglet.append(Target(6, "RED"))
+
+    node = loglet.read_by_index("RED", 3)
+    print(node)
+    node = loglet.read_by_target(Target(8, "GREEN"))
+    print(node)
