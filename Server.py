@@ -20,7 +20,7 @@ class SendDataThread(threading.Thread):
                 dataDict = {"color": "blue", "nid": 2, "payload": "server to client"}
                 dataToSend = json.dumps(dataDict).encode("utf-8")
                 self.clientSocket.send(dataToSend)
-            elif dataToSend == "over":
+            elif inputData == "over":
                 time.sleep(1)
                 self.running = False
                 self.clientSocket.close()
