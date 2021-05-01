@@ -15,10 +15,12 @@ class SendDataThread(threading.Thread):
     def run(self):
         self.running = True
         while (self.running):
-            dataToSend = input("发给客户端：")
-            if dataToSend != "\n" and dataToSend != "":
-                self.clientSocket.send((dataToSend).encode("utf-8"))
-            if dataToSend == "over":
+            inputData = input("发给客户端:(request/over)")
+            if inputData == "request":
+                dataDict = {"color": "blue", "nid": 2, "payload": "server to client"}
+                dataToSend = json.dumps(dataDict).encode("utf-8")
+                self.clientSocket.send(dataToSend)
+            elif dataToSend == "over":
                 time.sleep(1)
                 self.running = False
                 self.clientSocket.close()
@@ -36,16 +38,10 @@ class RecvDataThread(threading.Thread):
         self.running = True
         while (self.running):
             try:
-                #dataReceived = json.loads(self.clientSocket.recv(1024).decode("utf-8"))  
                 dataReceived = self.clientSocket.recv(1024).decode("utf-8")
                 if dataReceived != "":
-                    #dataReceived = json.loads(received)
                     print("\n客户端来信: ")
-                    print(dataReceived)
-                    print(type(dataReceived))
-                    print(repr(dataReceived))
                     dataDict = json.loads(dataReceived)
-                    print("\njson format: ")
                     print(dataDict)
                     if dataReceived == "over":
                         self.running = False

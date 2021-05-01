@@ -10,14 +10,14 @@ s.connect(address)
 
 #send
 print("发给服务器：")
-node = {"color": "red'", "nid": 1, "payload": "N/A"}
+node = {"color": "red", "nid": 1, "payload": "client to server"}
 dataToSend = json.dumps(node).encode("utf-8")
 s.send(dataToSend)
 print(dataToSend)
-print(type(dataToSend))
 
 #receive
-data = s.recv(1024)
-print(data)
+dataReceived = s.recv(1024).decode("utf-8")
+dataDict = json.loads(dataReceived)
+print(dataDict)
 
 s.close()
