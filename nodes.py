@@ -31,20 +31,21 @@ class Loglet():
     def append(self, node):
         # if not self._data.has_key(color):
         #     raise ValueError()
-        self._data[node.color].append(deepcopy(node))
+        for color in node.targets:
+            self._data[color].append(deepcopy(node))
 
     def read_by_index(self, color, index):
         if 0 <= index < len(self._data.get(color, [])):
             return self._data[color][index]
-        return None
+        return "Cannot find out the target node!"
 
-    def read_by_target(self, target):
-        if target.color not in self._data:
+    def read_by_target(self, color, node):
+        if color not in self._data:
             raise ValueError()
-        chain = self._data.get(target.color, [])
-        for node in chain:
-            if node.nid == target.nid:
-                return node
+        chain = self._data.get(color, [])
+        for current in chain:
+            if current.nid == node.nid:
+                return current
         return "Cannot find out the target node!"
 
 class LogIterator():
@@ -154,6 +155,24 @@ def _readall():
     print(seek(Target(None, "GREEN")))
     print()
 
+def nodeToDict(node):
+    dictData = {}
+    if node.nid is None:
+        dictData["nid"] = "None"
+    else:
+        dictData["nid"] = node.nid
+    dictData["payload"] = node.payload
+    dictData["targets"] = node.targets
+    return dictData
+
+def dictToNode(dictionary):
+    if dictionary["nid"] == "None":
+        nid = None
+    else:
+        nid = dictionary["nid"]
+    node = Node(nid, dictionary["payload"], dictionary["targets"])
+    return node
+
 #                                    (Active)
 #     AAAAAAAAAAAAAAAAAAAAAAAAAA    BBBBBBBBBB
 # RED 1 <- 2 <- 3 <- 6 <------ 9 <- 10 <- 13
@@ -171,45 +190,45 @@ def generate_test_case(num_colors, payload_size, interconnectivity_level, ratios
 
 
 if __name__ == '__main__':
-    append(Node(), [Target(None, "RED")])
-    append(Node(), [Target(1, "RED")])
-    append(Node(), [Target(2, "RED"), Target(None, "YELLOW")])
-    append(Node(), [Target(None, "GREEN")])
-    append(Node(), [Target(4, "GREEN")])
-    append(Node(), [Target(3, "RED")])
-    append(Node(), [Target(3, "YELLOW")])
-    append(Node(), [Target(7, "YELLOW"), Target(5, "GREEN")])
-    append(Node(), [Target(8, "YELLOW"), Target(8, "GREEN"), Target(6, "RED")])
-    # DEBUG
-    _readall()
-    add_loglet()
-    append(Node(), [Target(9, "RED")])
-    append(Node(), [Target(9, "YELLOW")])
-    append(Node(), [Target(9, "GREEN")])
-    append(Node(), [Target(10, "RED")])
-    # DEBUG
-    _readall()
-    trim_loglet()
-    # DEBUG
-    _readall()
+    # append(Node(), [Target(None, "RED")])
+    # append(Node(), [Target(1, "RED")])
+    # append(Node(), [Target(2, "RED"), Target(None, "YELLOW")])
+    # append(Node(), [Target(None, "GREEN")])
+    # append(Node(), [Target(4, "GREEN")])
+    # append(Node(), [Target(3, "RED")])
+    # append(Node(), [Target(3, "YELLOW")])
+    # append(Node(), [Target(7, "YELLOW"), Target(5, "GREEN")])
+    # append(Node(), [Target(8, "YELLOW"), Target(8, "GREEN"), Target(6, "RED")])
+    # # DEBUG
+    # _readall()
+    # add_loglet()
+    # append(Node(), [Target(9, "RED")])
+    # append(Node(), [Target(9, "YELLOW")])
+    # append(Node(), [Target(9, "GREEN")])
+    # append(Node(), [Target(10, "RED")])
+    # # DEBUG
+    # _readall()
+    # trim_loglet()
+    # # DEBUG
+    # _readall()
 
     # Test of Loglet class
     loglet = Loglet()
-    loglet.append(Target(None, "RED"))
-    loglet.append(Target(1, "RED"))
-    loglet.append(Target(2, "RED"))
-    loglet.append(Target(None, "YELLOW"))
-    loglet.append(Target(None, "GREEN"))
-    loglet.append(Target(4, "GREEN"))
-    loglet.append(Target(3, "RED"))
-    loglet.append(Target(3, "YELLOW"))
-    loglet.append(Target(7, "YELLOW"))
-    loglet.append(Target(5, "GREEN"))
-    loglet.append(Target(8, "YELLOW"))
-    loglet.append(Target(8, "GREEN"))
-    loglet.append(Target(6, "RED"))
+    loglet.append(Node(nid = None, payload = "N/A", targets = ["RED"]))
+    loglet.append(Node(nid = 1, payload = "N/A", targets = ["RED"]))
+    loglet.append(Node(nid = 2, payload = "N/A", targets = ["RED"]))
+    loglet.append(Node(nid = None, payload = "N/A", targets = ["YELLOW"]))
+    loglet.append(Node(nid = None, payload = "N/A", targets = ["GREEN"]))
+    loglet.append(Node(nid = 4, payload = "N/A", targets = ["GREEN"]))
+    loglet.append(Node(nid = 3, payload = "N/A", targets = ["RED", "YELLOW"]))
+    # loglet.append(Node(nid = 3, payload = "N/A", targets = ["YELLOW"]))
+    loglet.append(Node(nid = 7, payload = "N/A", targets = ["YELLOW"]))
+    loglet.append(Node(nid = 5, payload = "N/A", targets = ["GREEN"]))
+    loglet.append(Node(nid = 8, payload = "N/A", targets = ["YELLOW", "GREEN"]))
+    # loglet.append(Target(8, "GREEN"))
+    loglet.append(Node(nid = 6, payload = "N/A", targets = ["RED"]))
 
-    node = loglet.read_by_index("RED", 3)
+    node = loglet.read_by_index("RED", 10)
     print(node)
-    node = loglet.read_by_target(Target(8, "GREEN"))
+    node = loglet.read_by_target("GREEN", Node(nid = 13))
     print(node)

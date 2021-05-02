@@ -1,8 +1,10 @@
 # -*-coding:utf-8 -*-
+## Loglet as the Server
 import socket
 import threading
 import time
 import json
+import nodes
 
 class SendDataThread(threading.Thread):
     def setDestination(self, clientSocket, recvDataThread):
@@ -30,6 +32,7 @@ class RecvDataThread(threading.Thread):
     def setSource(self, clientSocket, sendDataThread):
         self.clientSocket = clientSocket
         self.senDataThread = sendDataThread
+        self.loglet = nodes.Loglet()
 
     def terminate(self):
         self.running = False
@@ -40,14 +43,46 @@ class RecvDataThread(threading.Thread):
             try:
                 dataReceived = self.clientSocket.recv(1024).decode("utf-8")
                 if dataReceived != "":
-                    print("\n客户端来信: ")
+                    print("\nHere is the dataReceived: ")
+                    print(dataReceived)
                     dataDict = json.loads(dataReceived)
-                    print(dataDict)
-                    if dataReceived == "over":
+
+                    if dataDict["operation"] == "append":
+                        print("Here is operation append.")
+                        dictNode = dataDict["node"]
+                        node = nodes.dictToNode(dictNode)
+                        self.loglet.append(node)
+                    elif dataDict["operation"] == "read_by_index":
+                        print("Here is operation read_by_index.")
+                        color = dataDict["color"]
+                        index = dataDict["index"]
+                        node = self.loglet.read_by_index(color, index)
+                        if node == "Cannot find out the target node!":
+                            dataToSend = node.encode("utf-8")
+                        else:
+                            dictNode = nodes.nodeToDict(node)
+                            dataToSend = json.dumps(dictNode).encode("utf-8")
+                        self.clientSocket.send(dataToSend)
+                        print("send %s to client successfully.", dataToSend)
+                    elif dataDict["operation"] == "read_by_target":
+                        print("Here is operation read_by_target.")
+                        targetNode = nodes.dictToNode(dataDict["target"])
+                        node = self.loglet.read_by_target(dataDict["color"], targetNode)
+                        if node == "Cannot find out the target node!":
+                            dataToSend = node.encode("utf-8")
+                        else:
+                            dictNode = nodes.nodeToDict(node)
+                            dataToSend = json.dumps(dictNode).encode("utf-8")
+                        self.clientSocket.send(dataToSend)
+                        print("send %s to client successfully.", dataToSend)
+                    elif dataDict["operation"] == "over":
+                        print("Here is operation over.")
                         self.running = False
                         self.clientSocket.close()
                         self.senDataThread.terminate()
-                        print("通信结束，按任意键关闭")
+                        print("The communication is over.")
+
+                    
             except:
                 pass
 
@@ -59,9 +94,9 @@ if __name__ == "__main__":
     tcpClientSocket = None
     serverOnUse = False
  
-    print("等待客户端连接")
+    print("Waiting for client to connect...")
     tcpClientSocket, clientIp = tcpServerSocket.accept()
-    print("新的客户端已连接：%s" % str(clientIp))
+    print("New client is connected: %s" % str(clientIp))
  
     sendDataThread = SendDataThread()
     recvDataThread = RecvDataThread()
