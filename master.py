@@ -1,9 +1,14 @@
 
 import asyncio
-from dataclasses import dataclass
 import json
 from collections import deque
-from typing_extensions import final
+from dataclasses import dataclass
+
+from loglet import Node, Target
+
+
+class RemoteLogletError(Exception):
+    pass
 
 
 @dataclass
@@ -18,21 +23,42 @@ class RemoteLoglet():
         self.writer.close()
         await self.writer.wait_closed()
 
-    def append(self, color, node):
-        pass
+    async def append(self, node):
+        payload = {"operation": "append"}
+        payload.update(**node.to_dict())
+        await self._request(payload)
 
-    def read(self, color, index):
-        pass
+    async def length(self, color):
+        response = await self._request({
+            "operation": "length",
+            "color": color
+        })
+        return response["value"]
 
-    def find(self, target):
-        pass
+    async def read(self, color, index):
+        response = await self._request({
+            "operation": "read",
+            "color": color,
+            "index": index
+        })
+        return Node(**response)
+
+    async def _request(self, dic):
+        assert isinstance(dic, dict)
+        self.writer.write(json.dumps(dic).encode())
+        self.writer.write("\r\n".encode())
+        await self.writer.drain()
+        response = await self.reader.readline()
+        response = json.loads(response.strip())
+        if not response.get("success", True):
+            raise RemoteLogletError(response.get("error"))
+        return response
 
 
 class LogletManager():
 
     def __init__(self) -> None:
         self._loglets = deque()
-        # fault tolarance?
 
     # management
 
@@ -46,69 +72,81 @@ class LogletManager():
 
     # client
 
-    def append(self, color, node):
-        pass
+    async def append(self, node):
+        await self._loglets[-1].append(node)
 
-    def read(self, color, index):
-        pass
-
-    def find(self, target):
-        pass
+    async def find(self, target):
+        for loglet in reversed(self._loglets):
+            length = await loglet.length(target.color)
+            for index in reversed(range(length)):
+                node = await loglet.read(target.color, index)
+                if not target.nid or node.nid == target.nid:
+                    return node
 
 
 manager = LogletManager()
 
 
-async def handle_echo(reader, writer):
+def jsonify(content={"acknoledged": True}):
+    if not isinstance(content, dict):
+        content = {"value": content}
+    return json.dumps(content).encode() + "\r\n".encode()
+
+
+async def handle_request(reader, writer):
+
+    # telnet clear screen
+    writer.write("\u001B[2J".encode())
+    await writer.drain()
 
     while True:
-
-        data = await reader.readline()
-        message = data.decode().strip()
+        message = await reader.readline()
+        message = message.strip()
         addr = writer.get_extra_info('peername')
 
         print(f"Received {message!r} from {addr!r}")
 
-        # -------------------------------------------------
-
-        if not message:
-            continue
-        if message.upper() == 'EXIT':
-            break
-
-        if message.upper().startswith("ADD"):
-            splits = data.split()
-            if not len(splits) == 3:
-                writer.write('Invalid command.'.encode())
-                continue
+        if message:
             try:
-                loglet = RemoteLoglet(splits[1], splits[2])
-                await loglet.connect()
-            except Exception:
-                pass
-            else:
-                manager.add_loglet(loglet)
+                dataDict = json.loads(message)
+                opscode = dataDict.pop("operation")
 
-        elif message.upper().startswith("TRIM"):
-            try:
-                pass
-            except BaseException:
-                pass
-            else:
-                pass
+                if opscode == "add_loglet":
+                    await manager.add_loglet(RemoteLoglet(
+                        dataDict["host"],
+                        dataDict["port"]
+                    ))
+                    writer.write(jsonify())
+
+                elif opscode == "trim_loglet":
+                    await manager.trim_loglet()
+                    writer.write(jsonify())
+
+                elif opscode == "append":
+                    await manager.append(Node(**dataDict))
+                    writer.write(jsonify())
+
+                elif opscode == "find":
+                    node = await manager.find(Target(
+                        dataDict["nid"],
+                        dataDict["color"]
+                    ))
+                    if node:
+                        writer.write(jsonify(node.to_dict()))
+                    else:
+                        raise ValueError("Not Found.")
+
+                elif opscode == "over":
+                    break
+
+            except Exception as exc:
+                writer.write(jsonify({
+                    "success": False,
+                    "error": str(exc)
+                }))
+
             finally:
-                manager.trim_loglet()
-
-        elif message.upper().startswith("FIND"):
-            pass
-        else:
-            pass
-
-        # -------------------------------------------------
-
-        print(f"Send: {message!r}")
-        writer.write(data)
-        await writer.drain()
+                await writer.drain()
 
     print("Close the connection")
     writer.close()
@@ -116,7 +154,7 @@ async def handle_echo(reader, writer):
 
 async def main():
     server = await asyncio.start_server(
-        handle_echo, '127.0.0.1', 9999)
+        handle_request, '127.0.0.1', 9999)
 
     addr = server.sockets[0].getsockname()
     print(f'Serving on {addr}')
@@ -124,66 +162,22 @@ async def main():
     async with server:
         await server.serve_forever()
 
-# class LogIterator():
+#                                    (Active)
+#     AAAAAAAAAAAAAAAAAAAAAAAAAA    BBBBBBBBBB
+# RED 1 <- 2 <- 3 <- 6 <------ 9 <- 10 <- 13
+# YEL           3 <- 7 <- 8 <- 9 <- 11
+# GRE 4 <- 5 <------------8 <- 9 <- 12
 
-#     def __init__(self, color):
-#         self.color = color
-
-#     def __iter__(self):
-#         # two pointers
-#         self.idx_loglet = len(loglets) - 1  # always valid
-#         self.idx_item = -1
-#         if self.idx_loglet != -1:
-#             self.idx_item = len(loglets[-1][self.color]) - 1
-#         return self
-
-#     def __next__(self):
-#         self._find_next()
-#         if self.idx_item != -1:
-#             loglet = loglets[self.idx_loglet]
-#             chain = loglet[self.color]
-#             _item = chain[self.idx_item]
-#             self.idx_item -= 1
-#             return _item
-#         else:
-#             raise StopIteration()
-
-#     def _find_next(self):
-#         # set the two pointers of the next available element to
-#         # a concrete position or (0, -1) indicating list exhausted
-
-#         if self.idx_loglet == 0 and self.idx_item == -1:
-#             return
-
-#         while not(0 <= self.idx_item < len(loglets[self.idx_loglet][self.color])):
-#             if self.idx_item == -1:
-#                 self.idx_loglet -= 1
-#                 if self.idx_loglet >= 0:
-#                     self.idx_item = len(loglets[self.idx_loglet][self.color]) - 1
-#                 else:
-#                     self.idx_item = -1
-#                 if self.idx_loglet == 0 and self.idx_item == -1:
-#                     break
-#             else:
-#                 raise RuntimeError()
-
-# def seek(target, _ans=None):
-#     chain = LogIterator(target.color)
-#     if _ans is None:
-#         _ans = []
-#     _targets = []
-#     _found = False
-#     for node in chain:
-#         if _found or node.nid == target.nid or target.nid is None:
-#             _found = True
-#             if node.nid not in _ans:
-#                 _ans.append(node.nid)
-#             for _target in node.targets:
-#                 if _target.color != target.color:
-#                     _targets.append(_target)
-#     for _target in _targets:
-#         seek(_target, _ans)
-#     return _ans
 
 if __name__ == '__main__':
     asyncio.run(main())
+
+# {"operation": "add_loglet", "host":"localhost", "port":2021}
+# {"operation": "append", "payload": "N/A",  "targets":[[null, "YELLOW"]], "nid": 1}
+# {"operation": "append", "payload": "N/A",  "targets":[[1, "YELLOW"]], "nid": 2}
+# {"operation": "append", "payload": "N/A",  "targets":[[2, "YELLOW"]], "nid": 3}
+# {"operation": "append", "payload": "N/A",  "targets":[[3, "RED"]], "nid": 4}
+# {"operation": "find","nid": 0,"color":"YELLOW"}
+# {"operation": "find","nid": 1,"color":"YELLOW"}
+# {"operation": "find","nid": 100,"color":"YELLOW"}
+# {"operation": "over"}

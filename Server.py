@@ -1,13 +1,12 @@
 # -*-coding:utf-8 -*-
 # Loglet as the Server
-from json.decoder import JSONDecodeError
-import socketserver
 import json
-import nodes
+import socketserver
+from json.decoder import JSONDecodeError
 
-loglet = nodes.Loglet()
+from loglet import Loglet, Node
 
-# TODO ERROR SERIALIZATION
+loglet = Loglet()
 
 
 class MyTCPHandler(socketserver.StreamRequestHandler):
@@ -17,7 +16,7 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
         # we can now use e.g. readline() instead of raw recv() calls
 
         # telnet clear screen
-        self.wfile.write("\u001B[2J".encode())
+        # self.wfile.write("\u001B[2J".encode())
 
         while True:
             dataReceived = self.rfile.readline().strip()
@@ -27,55 +26,51 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
             if dataReceived:
                 try:
                     dataDict = json.loads(dataReceived)
-                    opscode = dataDict.pop("operation", None)
+                    opscode = dataDict.pop("operation")
 
                     # FOR COMPATIBILITY
                     if "node" in dataDict:
                         dataDict.update(dataDict.pop("node"))
+                    # --------------------------------------
 
                     if opscode == "append":
-                        try:
-                            loglet.append(nodes.Node(**dataDict))
-                        except ValueError as error:
-                            self.wfile.write("Conflict.\r\n".encode())
+                        loglet.append(Node(**dataDict))
+                        self._write()
 
                     elif opscode == "read":
-                        try:
-                            node = loglet.read(
-                                dataDict["color"],
-                                dataDict["index"])
-                        except ValueError:
-                            self.wfile.write("Not Found.\r\n".encode())
-                        except IndexError:
-                            self.wfile.write("Not Found.\r\n".encode())
-                        else:
-                            self.wfile.write(node.encode() + b'\r\n')
+                        node = loglet.read(
+                            dataDict["color"],
+                            dataDict["index"])
+                        self._write(node.to_dict())
 
                     elif opscode == "length":
-                        try:
-                            length = loglet.length(dataDict["color"])
-                        except ValueError:
-                            self.wfile.write("Not Found.\r\n".encode())
-                        else:
-                            self.wfile.write(str(length).encode() + b'\r\n')
+                        length = loglet.length(dataDict["color"])
+                        self._write(length)
 
                     elif opscode == "debug":
                         for color in loglet._data:
-                            print("The color is: ", color)
+                            print(color)
                             for node in loglet._data[color]:
-                                print(node.nid)
-                                print(node.payload)
-                                print(node.targets)
+                                print(node.nid, node.payload, node.targets)
+                        self._write()
 
                     elif opscode == "over":
+                        self._write()
                         break
 
                 except JSONDecodeError:
-                    self.wfile.write("Invalid JSON.\r\n".encode())
-                except KeyError as error:
-                    self.wfile.write("Serialization format error ({}).\r\n".format(str(error)).encode())
-                except TypeError as error:
-                    self.wfile.write("Serialization format error ({}).\r\n".format(str(error)).encode())
+                    self._write_error("Invalid JSON.")
+                except Exception as exc:
+                    self._write_error(exc)
+
+    def _write_error(self, error):
+        self._write({"success": False, "error": str(error), "type": type(error).__name__})
+
+    def _write(self, content={"acknoledged": True}):
+        if not isinstance(content, dict):
+            content = {"value": content}
+        self.wfile.write(json.dumps(content).encode())
+        self.wfile.write("\r\n".encode())
 
 
 if __name__ == "__main__":
@@ -86,3 +81,14 @@ if __name__ == "__main__":
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
         server.serve_forever()
+
+# {"operation": "append", "payload": "N/A",  "targets":[[null, "YELLOW"]], "nid": 1}
+# {"operation": "append", "payload": "N/A",  "targets":[[1, "YELLOW"]], "nid": 2}
+# {"operation": "append", "payload": "N/A",  "targets":[[2, "YELLOW"]], "nid": 3}
+# {"operation": "append", "payload": "N/A",  "targets":[[3, "RED"]], "nid": 4}
+# {"operation": "read","index": 0,"color":"YELLOW"}
+# {"operation": "read","index": 1,"color":"YELLOW"}
+# {"operation": "read","index": 100,"color":"YELLOW"}
+# {"operation": "length", "color": "YELLOW"}
+# {"operation": "debug"}
+# {"operation": "over"}
