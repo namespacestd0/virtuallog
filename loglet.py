@@ -15,15 +15,9 @@ class Loglet():
     def __init__(self):
         self._data = defaultdict(list)
 
-    def _appendable(self, target):
-        if target.color in self._data and self._data[target.color]:
-            return self._data[target.color][-1].nid == target.nid
-        else:  # new color
-            return True
-
     def append(self, node):
-        if not all(map(self._appendable, node.targets)):
-            raise ValueError("Conflict.")
+        # faithfully append the node without DAG validation
+        # assuming that it is performed in the upper layer
         for target in node.targets:
             self._data[target.color].append(deepcopy(node))
 

@@ -72,7 +72,22 @@ class LogletManager():
 
     # client
 
+    async def _appendable(self, target):
+        for loglet in reversed(self._loglets):
+            length = await loglet.length(target.color)
+            for index in reversed(range(length)):
+                node = await loglet.read(target.color, index)
+                # this is the last node of the target color
+                return node.nid == target.nid
+        # no conflicting record
+        return True
+
     async def append(self, node):
+        if not self._loglets:
+            raise TypeError("No available loglet.")
+        for target in node.targets:
+            if not await self._appendable(target):
+                raise ValueError("Conflict.")
         await self._loglets[-1].append(node)
 
     async def find(self, target):
@@ -96,7 +111,7 @@ def jsonify(content={"acknoledged": True}):
 async def handle_request(reader, writer):
 
     # telnet clear screen
-    # writer.write("\u001B[2J".encode())
+    writer.write("\u001B[2J".encode())
     await writer.drain()
 
     while True:
@@ -173,11 +188,24 @@ if __name__ == '__main__':
     asyncio.run(main())
 
 # {"operation": "add_loglet", "host":"localhost", "port":2021}
-# {"operation": "append", "payload": "N/A",  "targets":[[null, "YELLOW"]], "nid": 1}
-# {"operation": "append", "payload": "N/A",  "targets":[[1, "YELLOW"]], "nid": 2}
-# {"operation": "append", "payload": "N/A",  "targets":[[2, "YELLOW"]], "nid": 3}
-# {"operation": "append", "payload": "N/A",  "targets":[[3, "RED"]], "nid": 4}
+# {"operation": "append", "payload": "N/A",  "targets":[[null, "RED"]], "nid": 1}
+# {"operation": "append", "payload": "N/A",  "targets":[[1, "RED"]], "nid": 2}
+# {"operation": "append", "payload": "N/A",  "targets":[[2, "RED"], [null, "YELLOW"]], "nid": 3}
+# {"operation": "append", "payload": "N/A",  "targets":[[null, "GREEN"]], "nid": 4}
+# {"operation": "append", "payload": "N/A",  "targets":[[4, "GREEN"]], "nid": 5}
+# {"operation": "append", "payload": "N/A",  "targets":[[3, "RED"]], "nid": 6}
+# {"operation": "append", "payload": "N/A",  "targets":[[3, "YELLOW"]], "nid": 7}
+# {"operation": "append", "payload": "N/A",  "targets":[[7, "YELLOW"], [5, "GREEN"]], "nid": 8}
+# {"operation": "append", "payload": "N/A",  "targets":[[6, "RED"], [8, "YELLOW"], [8, "GREEN"]], "nid": 9}
+# {"operation": "add_loglet", "host":"localhost", "port":2022}
+# {"operation": "append", "payload": "N/A",  "targets":[[9, "RED"]], "nid": 10}
+# {"operation": "append", "payload": "N/A",  "targets":[[9, "YELLOW"]], "nid": 11}
+# {"operation": "append", "payload": "N/A",  "targets":[[9, "GREEN"]], "nid": 12}
 # {"operation": "find","nid": 0,"color":"YELLOW"}
-# {"operation": "find","nid": 1,"color":"YELLOW"}
+# {"operation": "find","nid": 1,"color":"RED"}
+# {"operation": "find","nid": 2,"color":"RED"}
+# {"operation": "find","nid": 3,"color":"RED"}
 # {"operation": "find","nid": 100,"color":"YELLOW"}
+# {"operation": "trim_loglet"}
+# {"operation": "find","nid": 2,"color":"RED"}
 # {"operation": "over"}

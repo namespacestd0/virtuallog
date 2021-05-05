@@ -2,6 +2,7 @@
 # Loglet as the Server
 import json
 import socketserver
+from argparse import ArgumentParser
 from json.decoder import JSONDecodeError
 
 from loglet import Loglet, Node
@@ -15,53 +16,59 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
         # self.rfile is a file-like object created by the handler;
         # we can now use e.g. readline() instead of raw recv() calls
 
+        print("Connection Established: {}".format(self.client_address[0]))
+
         # telnet clear screen
         # self.wfile.write("\u001B[2J".encode())
 
         while True:
-            dataReceived = self.rfile.readline().strip()
+            dataReceived = self.rfile.readline()
+            if not dataReceived:
+                break
+
+            dataReceived = dataReceived.strip()
+
             print("{} wrote:".format(self.client_address[0]))
             print(dataReceived)
 
-            if dataReceived:
-                try:
-                    dataDict = json.loads(dataReceived)
-                    opscode = dataDict.pop("operation")
+            try:
+                dataDict = json.loads(dataReceived)
+                opscode = dataDict.pop("operation")
 
-                    # FOR COMPATIBILITY
-                    if "node" in dataDict:
-                        dataDict.update(dataDict.pop("node"))
-                    # --------------------------------------
+                # FOR COMPATIBILITY
+                if "node" in dataDict:
+                    dataDict.update(dataDict.pop("node"))
+                # --------------------------------------
 
-                    if opscode == "append":
-                        loglet.append(Node(**dataDict))
-                        self._write()
+                if opscode == "append":
+                    loglet.append(Node(**dataDict))
+                    self._write()
 
-                    elif opscode == "read":
-                        node = loglet.read(
-                            dataDict["color"],
-                            dataDict["index"])
-                        self._write(node.to_dict())
+                elif opscode == "read":
+                    node = loglet.read(
+                        dataDict["color"],
+                        dataDict["index"])
+                    self._write(node.to_dict())
 
-                    elif opscode == "length":
-                        length = loglet.length(dataDict["color"])
-                        self._write(length)
+                elif opscode == "length":
+                    length = loglet.length(dataDict["color"])
+                    self._write(length)
 
-                    elif opscode == "debug":
-                        for color in loglet._data:
-                            print(color)
-                            for node in loglet._data[color]:
-                                print(node.nid, node.payload, node.targets)
-                        self._write()
+                elif opscode == "debug":
+                    for color in loglet._data:
+                        print(color)
+                        for node in loglet._data[color]:
+                            print(node.nid, node.payload, node.targets)
+                    self._write()
 
-                    elif opscode == "over":
-                        self._write()
-                        break
+                elif opscode == "over":
+                    self._write()
+                    break
 
-                except JSONDecodeError:
-                    self._write_error("Invalid JSON.")
-                except Exception as exc:
-                    self._write_error(exc)
+            except JSONDecodeError:
+                self._write_error("Invalid JSON.")
+            except Exception as exc:
+                self._write_error(exc)
 
     def _write_error(self, error):
         self._write({"success": False, "error": str(error), "type": type(error).__name__})
@@ -75,9 +82,11 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
 
 if __name__ == "__main__":
 
-    HOST, PORT = "localhost", 2021
-
-    with socketserver.TCPServer((HOST, PORT), MyTCPHandler) as server:
+    parser = ArgumentParser("A Loglet Server.")
+    parser.add_argument("--host", dest="host", default="0.0.0.0", help="interface binding address")
+    parser.add_argument("port", type=int, help="interface binding address")
+    args = parser.parse_args()
+    with socketserver.TCPServer((args.host, args.port), MyTCPHandler) as server:
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
         server.serve_forever()
