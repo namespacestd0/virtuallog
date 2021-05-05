@@ -80,7 +80,7 @@ class LogletManager():
             length = await loglet.length(target.color)
             for index in reversed(range(length)):
                 node = await loglet.read(target.color, index)
-                if not target.nid or node.nid == target.nid:
+                if target.nid is None or node.nid == target.nid:
                     return node
 
 
@@ -96,7 +96,7 @@ def jsonify(content={"acknoledged": True}):
 async def handle_request(reader, writer):
 
     # telnet clear screen
-    writer.write("\u001B[2J".encode())
+    # writer.write("\u001B[2J".encode())
     await writer.drain()
 
     while True:
