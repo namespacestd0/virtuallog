@@ -5,9 +5,9 @@ import socketserver
 from argparse import ArgumentParser
 from json.decoder import JSONDecodeError
 
-from loglet import Loglet, Node
+from loglet import Memlet, Filelet, Node
 
-loglet = Loglet()
+loglet = None
 
 
 class MyTCPHandler(socketserver.StreamRequestHandler):
@@ -85,7 +85,14 @@ if __name__ == "__main__":
     parser = ArgumentParser("A Loglet Server.")
     parser.add_argument("--host", dest="host", default="0.0.0.0", help="interface binding address")
     parser.add_argument("port", type=int, help="interface binding address")
+    parser.add_argument("mode", choices=['mem', 'file'], help="choose loglet implementation")
     args = parser.parse_args()
+
+    if args.mode == 'mem':
+        loglet = Memlet()
+    elif args.mode == 'file':
+        loglet = Filelet()
+
     with socketserver.TCPServer((args.host, args.port), MyTCPHandler) as server:
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
