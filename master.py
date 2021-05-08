@@ -102,7 +102,7 @@ class LogletManager():
 manager = LogletManager()
 
 
-def jsonify(content={"acknoledged": True}):
+def jsonify(content={"acknowledged": True}):
     if not isinstance(content, dict):
         content = {"value": content}
     return json.dumps(content).encode() + "\r\n".encode()
@@ -116,6 +116,8 @@ async def handle_request(reader, writer):
 
     while True:
         message = await reader.readline()
+        if not message:
+            break
         message = message.strip()
         addr = writer.get_extra_info('peername')
 

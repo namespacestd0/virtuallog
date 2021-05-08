@@ -73,7 +73,7 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
     def _write_error(self, error):
         self._write({"success": False, "error": str(error), "type": type(error).__name__})
 
-    def _write(self, content={"acknoledged": True}):
+    def _write(self, content={"acknowledged": True}):
         if not isinstance(content, dict):
             content = {"value": content}
         self.wfile.write(json.dumps(content).encode())

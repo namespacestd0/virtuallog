@@ -17,8 +17,8 @@ class Node():
         self.targets = targets or []
         self.targets = [Target(*target) for target in self.targets]
 
-    def __str__(self):
-        return f"Node({self.nid})"
+    def __repr__(self):
+        return str(self.to_dict())
 
     def to_dict(self):
         return {
