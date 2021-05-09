@@ -103,6 +103,59 @@ class VirtualLogTester():
         return time.time() - t0
 
 
+def test_1(sockf, args):
+    testcases = generate_test_cases(args.colors, args.nodes, args.singles)
+    tester = VirtualLogTester(sockf)
+    tester.prepare()
+    print("WRITING TO VIRTUALLOG...")
+    print("WRITE TIME:", tester.write_all(testcases))
+    print("VALIDATING RESULTS...")
+    print("READ TIME:", tester.read_all(random.sample(testcases, args.reads)))
+    tester.finished()
+
+
+def test_2(sockf, args):
+    testcases = generate_test_cases(args.colors, args.nodes, args.singles)
+    x = len(testcases) // 9  # individual segment length
+
+    tester = VirtualLogTester(sockf)
+    write_time = []
+    read_time = []
+    cread_time = []  # cumulative
+
+    for round in range(3):
+        print(f"ROUND [{round + 1}/3]")
+        if round == 0:
+            tester.prepare(port=2021)
+        elif round == 1:
+            tester.prepare(port=2022)
+        else:
+            tester.finished()  # close the first loglet
+
+        for offset in range(3):
+            n = round * 3 + offset  # multiplier
+            t = tester.write_all(testcases[n * x: (n + 1) * x])
+            print("WRITE TIME:", t)
+            write_time.append(t)
+            t = tester.read_all(random.sample(testcases[n * x: (n + 1) * x], args.reads))
+            print("READ TIME:", t)
+            read_time.append(t)
+            if round < 2:
+                t = tester.read_all(random.sample(testcases[: (n + 1) * x], args.reads))
+            else:  # last round doesn't have the first segment available
+                t = tester.read_all(random.sample(testcases[3 * x: (n + 1) * x], args.reads))
+            print("CUMULATIVE READ:", t)
+            cread_time.append(t)
+
+    tester.finished()  # close the second loglet
+
+    print()
+    print("SUMMARY")
+    print("WRITE:", write_time)
+    print("READ:", read_time)
+    print("CUMR:", cread_time)
+
+
 def main():
     HOST, PORT = "localhost", 9999
 
@@ -111,9 +164,7 @@ def main():
     parser.add_argument("--singles", type=float, default=0.7)
     parser.add_argument("--nodes", type=int, default=1000)
     parser.add_argument("--reads", type=int, default=100)
-
     args = parser.parse_args()
-    testcases = generate_test_cases(args.colors, args.nodes, args.singles)
 
     print("CONNECTING...")
     # Create a socket (SOCK_STREAM means a TCP socket)
@@ -124,13 +175,8 @@ def main():
         sockf = sock.makefile('wr')
         # sock.recv(1024)  # clear telnet command
 
-        tester = VirtualLogTester(sockf)
-        tester.prepare()
-        print("WRITING TO VIRTUALLOG...")
-        print("WRITE TIME:", tester.write_all(testcases))
-        print("VALIDATING RESULTS...")
-        print("READ TIME:", tester.read_all(random.sample(testcases, args.reads)))
-        tester.finished()
+        # test_1(sockf, args)
+        test_2(sockf, args)
 
 
 if __name__ == "__main__":
