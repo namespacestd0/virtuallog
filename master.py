@@ -215,6 +215,7 @@ if __name__ == '__main__':
 # {"operation": "append", "payload": "N/A",  "targets":[[9, "GREEN"]], "nid": 12}
 # {"operation": "find","nid": 0,"color":"YELLOW"}
 # {"operation": "find","nid": 1,"color":"RED"}
+# {"operation": "find","nid": null,"color":"RED"}
 # {"operation": "find","nid": 2,"color":"RED"}
 # {"operation": "find","nid": 3,"color":"RED"}
 # {"operation": "find","nid": 100,"color":"YELLOW"}
