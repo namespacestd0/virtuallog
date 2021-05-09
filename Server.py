@@ -2,10 +2,11 @@
 # Loglet as the Server
 import json
 import socketserver
+import sys
 from argparse import ArgumentParser
 from json.decoder import JSONDecodeError
 
-from loglet import Memlet, Filelet, Node
+from loglet import Filelet, Memlet, Node
 
 loglet = None
 
@@ -28,8 +29,8 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
 
             dataReceived = dataReceived.strip()
 
-            print("{} wrote:".format(self.client_address[0]))
-            print(dataReceived)
+            print("{}:".format(self.client_address[0]))
+            print("<<", dataReceived)
 
             try:
                 dataDict = json.loads(dataReceived)
@@ -63,7 +64,7 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
 
                 elif opscode == "over":
                     self._write()
-                    break
+                    sys.exit()
 
             except JSONDecodeError:
                 self._write_error("Invalid JSON.")
@@ -78,6 +79,7 @@ class MyTCPHandler(socketserver.StreamRequestHandler):
             content = {"value": content}
         self.wfile.write(json.dumps(content).encode())
         self.wfile.write("\r\n".encode())
+        print(">>", content)
 
 
 if __name__ == "__main__":

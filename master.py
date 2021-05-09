@@ -43,6 +43,10 @@ class RemoteLoglet():
         })
         return Node(**response)
 
+    async def over(self):
+        payload = {"operation": "over"}
+        await self._request(payload)
+
     async def _request(self, dic):
         assert isinstance(dic, dict)
         self.writer.write(json.dumps(dic).encode())
@@ -68,6 +72,7 @@ class LogletManager():
 
     async def trim_loglet(self):
         loglet = self._loglets.popleft()
+        await loglet.over()  # FOR TESTING
         await loglet.close()
 
     # client
@@ -111,8 +116,12 @@ def jsonify(content={"acknowledged": True}):
 async def handle_request(reader, writer):
 
     # telnet clear screen
-    writer.write("\u001B[2J".encode())
-    await writer.drain()
+    # writer.write("\u001B[2J".encode())
+    # await writer.drain()
+
+    def lwrite(content):
+        print(">>", content.strip())
+        writer.write(content)
 
     while True:
         message = await reader.readline()
@@ -121,7 +130,8 @@ async def handle_request(reader, writer):
         message = message.strip()
         addr = writer.get_extra_info('peername')
 
-        print(f"Received {message!r} from {addr!r}")
+        print(f"{addr!r}")
+        print(f"<< {message!r}")
 
         if message:
             try:
@@ -133,15 +143,15 @@ async def handle_request(reader, writer):
                         dataDict["host"],
                         dataDict["port"]
                     ))
-                    writer.write(jsonify())
+                    lwrite(jsonify())
 
                 elif opscode == "trim_loglet":
                     await manager.trim_loglet()
-                    writer.write(jsonify())
+                    lwrite(jsonify())
 
                 elif opscode == "append":
                     await manager.append(Node(**dataDict))
-                    writer.write(jsonify())
+                    lwrite(jsonify())
 
                 elif opscode == "find":
                     node = await manager.find(Target(
@@ -149,7 +159,7 @@ async def handle_request(reader, writer):
                         dataDict["color"]
                     ))
                     if node:
-                        writer.write(jsonify(node.to_dict()))
+                        lwrite(jsonify(node.to_dict()))
                     else:
                         raise ValueError("Not Found.")
 
@@ -157,7 +167,7 @@ async def handle_request(reader, writer):
                     break
 
             except Exception as exc:
-                writer.write(jsonify({
+                lwrite(jsonify({
                     "success": False,
                     "error": str(exc)
                 }))

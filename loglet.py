@@ -1,11 +1,10 @@
 import json
-from collections import defaultdict, deque, namedtuple
+from collections import defaultdict, namedtuple
 from copy import deepcopy
-from dataclasses import dataclass
 from itertools import count
 from os import path
 
-ids = count(1)
+ids = count(1)  # only used for dev purposes
 
 Target = namedtuple('Target', ('nid', 'color'))
 
@@ -40,7 +39,7 @@ class Loglet():
         raise NotImplementedError
 
 
-class Memlet():
+class Memlet(Loglet):
 
     def __init__(self):
         self._data = defaultdict(list)
@@ -58,7 +57,7 @@ class Memlet():
         return len(self._data.get(color, []))
 
 
-class Filelet():
+class Filelet(Loglet):
 
     def __init__(self, root='./_tmp'):
         assert path.isdir(root)

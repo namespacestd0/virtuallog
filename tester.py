@@ -4,14 +4,11 @@ import socket
 import time
 from collections import defaultdict
 from itertools import count
+from argparse import ArgumentParser
 
 from loglet import Node, Target
 
 COLORS = ["RED", "GREEN", "YELLOW", "BLUE", "PINK", "WHITE", "BLACK", "GREY", "ORANGE", "PURPLE"]
-
-# TODO weights
-
-ids = count(1)
 
 
 def generate_test_cases(num_of_colors=5, num_of_nodes=1000, single_color_factor=0.7):
@@ -22,10 +19,13 @@ def generate_test_cases(num_of_colors=5, num_of_nodes=1000, single_color_factor=
     # we only have 10 pre-defined colors
 
     ans = []
+    ids = count(1)
     ref = defaultdict(list)
     colors = list(COLORS[:num_of_colors])
 
     for _ in range(num_of_nodes):
+
+        # generate targets
         if random.random() < single_color_factor:
             _targets = [random.choice(colors)]
         else:  # this node has multiple colors
@@ -39,6 +39,8 @@ def generate_test_cases(num_of_colors=5, num_of_nodes=1000, single_color_factor=
 
         targets = list(map(targetify, _targets))
         node = Node(str(next(ids)), targets=targets)
+
+        # maintain DAG tail view reference
         for target in targets:
             ref[target.color].append(node)
         ans.append(node)
@@ -46,54 +48,90 @@ def generate_test_cases(num_of_colors=5, num_of_nodes=1000, single_color_factor=
     return ans
 
 
-def generate_test_request(testcase):
-    request = testcase.to_dict()
-    request["operation"] = "append"
-    return (json.dumps(request) + '\n').encode()
+class VirtualLogTester():
+
+    def __init__(self, sockf):
+        self.sockf = sockf
+
+    @staticmethod
+    def _assert(res):
+        res = json.loads(res.strip())
+        assert res.get("acknowledged"), res
+
+    def prepare(self, host="localhost", port=2021):
+        self.sockf.write(json.dumps({
+            "operation": "add_loglet",
+            "host": host,
+            "port": port}))
+        self.sockf.write('\n')
+        self.sockf.flush()
+        self._assert(self.sockf.readline())
+
+    def finished(self):
+        self.sockf.write(json.dumps({
+            "operation": "trim_loglet",
+        }))
+        self.sockf.write('\n')
+        self.sockf.flush()
+        self._assert(self.sockf.readline())
+
+    def write_all(self, nodes):
+        t0 = time.time()
+        for node in nodes:
+            request = node.to_dict()
+            request["operation"] = "append"
+            self.sockf.write(json.dumps(request))
+            self.sockf.write('\n')
+            self.sockf.flush()
+            self._assert(self.sockf.readline())
+        return time.time() - t0
+
+    def read_all(self, nodes):
+        t0 = time.time()
+        for node in nodes:
+            request = {
+                "operation": "find",
+                "nid": node.nid,
+                "color": random.choice(node.targets).color
+            }
+            self.sockf.write(json.dumps(request))
+            self.sockf.write('\n')
+            self.sockf.flush()
+            res = self.sockf.readline()
+            res = json.loads(res.strip())
+            assert res["nid"] == node.nid
+        return time.time() - t0
 
 
-def _assert(res):
-    res = json.loads(res.strip())
-    assert res["acknowledged"]
-
-
-if __name__ == "__main__":
-
+def main():
     HOST, PORT = "localhost", 9999
 
-    print("CONNECTING...")
+    parser = ArgumentParser("A Loglet Server.")
+    parser.add_argument("--colors", type=int, default=5)
+    parser.add_argument("--singles", type=float, default=0.7)
+    parser.add_argument("--writes", type=int, default=1000)
+    parser.add_argument("--reads", type=float, default=100)
 
+    args = parser.parse_args()
+    testcases = generate_test_cases(args.colors, args.writes, args.singles)
+
+    print("CONNECTING...")
     # Create a socket (SOCK_STREAM means a TCP socket)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         # Connect to server and send data
         sock.connect((HOST, PORT))
         sock.settimeout(5)
         sockf = sock.makefile('wr')
+        # sock.recv(1024)  # clear telnet command
 
-        sock.recv(1024)  # clear telnet command
-
-        sockf.write(json.dumps({"operation": "add_loglet", "host": "localhost", "port": 2021}))
-        sockf.write('\n')
-        sockf.flush()
-
-        _assert(sockf.readline())
-        print("SENDING REQUESTS...")
-
-        testcases = generate_test_cases()
-        t0 = time.time()
-        for testcase in testcases:
-            request = generate_test_request(testcase)
-            sock.sendall(request)
-
+        tester = VirtualLogTester(sockf)
+        tester.prepare()
+        print("WRITING TO VIRTUALLOG...")
+        print("WRITE TIME:", tester.write_all(testcases))
         print("VALIDATING RESULTS...")
+        print("READ TIME:", tester.read_all(random.sample(testcases, args.reads)))
+        tester.finished()
 
-        while True:
-            try:
-                response = sockf.readline()
-            except OSError:
-                break
-            if not response:
-                break
-            _assert(response)
 
-        print("TOTAL TIME:", time.time() - t0 - 5)
+if __name__ == "__main__":
+    main()
