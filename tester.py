@@ -29,7 +29,7 @@ def generate_test_cases(num_of_colors=5, num_of_nodes=1000, single_color_factor=
         if random.random() < single_color_factor:
             _targets = [random.choice(colors)]
         else:  # this node has multiple colors
-            _targets = random.sample(colors, random.randrange(2, len(colors)))
+            _targets = random.sample(colors, random.randrange(2, len(colors) + 1))
 
         def targetify(color):
             last_one = None
@@ -110,7 +110,7 @@ def main():
     parser.add_argument("--colors", type=int, default=5)
     parser.add_argument("--singles", type=float, default=0.7)
     parser.add_argument("--nodes", type=int, default=1000)
-    parser.add_argument("--reads", type=float, default=100)
+    parser.add_argument("--reads", type=int, default=100)
 
     args = parser.parse_args()
     testcases = generate_test_cases(args.colors, args.nodes, args.singles)
