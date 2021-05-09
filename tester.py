@@ -106,14 +106,14 @@ class VirtualLogTester():
 def main():
     HOST, PORT = "localhost", 9999
 
-    parser = ArgumentParser("A Loglet Server.")
+    parser = ArgumentParser("A VirtualLog Tester.")
     parser.add_argument("--colors", type=int, default=5)
     parser.add_argument("--singles", type=float, default=0.7)
-    parser.add_argument("--writes", type=int, default=1000)
+    parser.add_argument("--nodes", type=int, default=1000)
     parser.add_argument("--reads", type=float, default=100)
 
     args = parser.parse_args()
-    testcases = generate_test_cases(args.colors, args.writes, args.singles)
+    testcases = generate_test_cases(args.colors, args.nodes, args.singles)
 
     print("CONNECTING...")
     # Create a socket (SOCK_STREAM means a TCP socket)
